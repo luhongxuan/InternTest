@@ -20,7 +20,8 @@ class ProcedureKnowledgeBase:
     def _build_index(self):
         print("建立操作手冊索引...")
         for proc in self.procedures:
-            text = f"{proc['name']}. {proc['description']}. 使用時機: {proc['when_to_use']}"
+            use_when_str = ", ".join(proc.get('use_when', []))
+            text = f"{proc['name']}. {proc.get('goal', '')}. 使用時機: {use_when_str}"
             self.embeddings[proc['id']] = self._get_embedding(text)
         print(f"完成,共 {len(self.procedures)} 個操作")
     
@@ -41,9 +42,9 @@ class ProcedureKnowledgeBase:
         summary = "【可用的操作手冊】\n\n"
         for proc in self.procedures:
             summary += f"◆ {proc['id']}: {proc['name']}\n"
-            summary += f"  說明: {proc['description']}\n"
-            summary += f"  什麼時候用: {proc['when_to_use']}\n"
-            summary += f"  執行後: {proc['after_this']}\n\n"
+            summary += f"  目標: {proc.get('goal', '')}\n"
+            summary += f"  使用時機: {', '.join(proc.get('use_when', []))}\n"
+            summary += f"  禁止使用時機: {', '.join(proc.get('do_not_use_when', []))}\n\n"
         return summary
     
     def get_procedure(self, procedure_id: str) -> dict:
