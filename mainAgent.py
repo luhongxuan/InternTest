@@ -82,7 +82,7 @@ class AgentTools:
 
             screenshot.thumbnail((1280, 800)) 
 
-            screenshot.save(f"screenshot/{current_step_index}_screenshot.png")
+            screenshot.save(f"screenshot/screenshot.png")
             
             buffer = io.BytesIO()
             screenshot.save(buffer, format='PNG')
@@ -109,6 +109,8 @@ class AgentTools:
         real_x = x * (actual.width / screen_size[0])
         real_y = y * (actual.height / screen_size[1])
         pyautogui.moveTo(real_x, real_y, duration=0.8)
+        pyautogui.click()
+        time.sleep(0.1)
         pyautogui.click()
         return {'success': True, 'message': f"用座標點擊了 ({real_x:.0f}, {real_y:.0f})"}
     
@@ -192,7 +194,7 @@ class VisionGuidedAgent:
                     "final_success_criteria": [
                         "目標檔案已開啟過",
                         "指定文字已加入檔案末尾",
-                        "檔案已儲存",
+                        "檔案已儲存，確保這個筆記上方的分頁的圓形點點消失，表示已經儲存",
                         "記事本已關閉"
                     ]
                     }}
@@ -207,13 +209,19 @@ class VisionGuidedAgent:
             raw = raw.split("\n", 1)[1].rsplit("\n", 1)[0]
         try:
             parsed = json.loads(raw)
-            # 將 {"plan": [{"procedure_id": "open_file"}, ...]} 轉換成字串陣列
             if isinstance(parsed, dict) and "plan" in parsed:
-                return [step.get("procedure_id") for step in parsed["plan"] if "procedure_id" in step]
+                # 保留完整的 plan（包含 inputs 和 reason）
+                return parsed["plan"]
             return parsed
         except Exception as e:
             print(f"[警告] 規劃失敗 ({e})，使用預設安全計畫")
-            return ["open_file", "add_text_to_end", "save_file", "close_notepad", "handle_save_dialog"]
+            return [
+                {"procedure_id": "open_file", "inputs": {"file_path": dynamic_params.get("file_path")}, "reason": "開啟檔案"},
+                {"procedure_id": "add_text_to_end", "inputs": {"text": dynamic_params.get("text")}, "reason": "加入文字"},
+                {"procedure_id": "save_file", "inputs": {}, "reason": "儲存"},
+                {"procedure_id": "close_notepad", "inputs": {}, "reason": "關閉"},
+                {"procedure_id": "handle_save_dialog", "inputs": {}, "reason": "處理可能的對話框"}
+            ]
 
     def execute_task(self, task_description: str, dynamic_params: dict):
         plan = self._generate_plan(task_description, dynamic_params)
@@ -231,7 +239,8 @@ class VisionGuidedAgent:
             "save_dialog_visible": False
         }
         
-        for step_idx, procedure_id in enumerate(plan):
+        for step_idx, procedure in enumerate(plan):
+            procedure_id = procedure.get("procedure_id")
             proc = self.kb.get_procedure(procedure_id)
             if not proc: continue
                 
@@ -248,7 +257,7 @@ class VisionGuidedAgent:
             last_action_result = {"status": "尚未開始執行"}
             
             micro_step_count = 0 
-            max_micro_steps = 3 # 增加微步上限，因為現在切成逐 step 執行 
+            max_micro_steps = 10 # 增加微步上限，因為現在切成逐 step 執行 
             
             while micro_step_count < max_micro_steps:
                 micro_step_count += 1
@@ -311,7 +320,49 @@ class VisionGuidedAgent:
         suggested_steps = json.dumps(proc['steps'], ensure_ascii=False, indent=2)
         for key, val in dynamic_params.items():
             suggested_steps = suggested_steps.replace(f"{{{key}}}", str(val))
-            
+        
+        total_steps = len(proc['steps'])
+        is_executing = current_step_index < total_steps
+
+        if is_executing:
+            # 【執行階段】：沒收 advance_plan，強制它只能做事或推進單一步驟
+            current_step_info = json.dumps(proc['steps'][current_step_index], ensure_ascii=False, indent=2)
+            phase_instruction = f"""
+            【目前狀態：執行步驟中 (進度: 第 {current_step_index + 1}/{total_steps} 步)】
+            你的唯一任務是執行這一個步驟：
+            {current_step_info}
+
+            ⚠️ 警告：因為步驟尚未全部執行完畢，你【絕對不可以】回傳 advance_plan！
+            如果你認為這個步驟已經達成，請回傳 advance_step 進入下一步。
+            """
+            available_actions = """
+            - click_by_image
+            - click_by_coordinates
+            - check_element_exists
+            - type_text
+            - press_key
+            - hotkey
+            - open_program
+            - wait
+            - advance_step
+            - need_recovery
+            """
+        else:
+            # 【驗證階段】：沒收所有操作工具，強制它只能檢查畫面
+            phase_instruction = f"""
+            【目前狀態：所有步驟已執行完畢，進入驗證階段】
+            你的唯一任務是：檢查目前的螢幕截圖，是否完全符合以下 success_checks：
+            {json.dumps(proc.get("success_checks", []), ensure_ascii=False, indent=2)}
+
+            如果畫面完全符合成功標準，請回傳 advance_plan。
+            如果畫面不符合（例如還停留在錯誤畫面，或者沒有發生預期變化），請回傳 need_recovery。
+            """
+            available_actions = """
+            - advance_plan
+            - need_recovery
+            - task_failed
+            """
+
         prompt = f"""
                     你是本地端電腦操作 Agent 的 Procedure Step Executor。
 
@@ -327,6 +378,8 @@ class VisionGuidedAgent:
 
                     procedure 目標：
                     {proc.get("goal", "")}
+
+                    {phase_instruction}
 
                     procedure steps：
                     {suggested_steps}
@@ -371,10 +424,21 @@ class VisionGuidedAgent:
                     圖片庫：
                     {self.image_lib.get_element_description()}
 
+                    你現在看到的是螢幕截圖。
+
+                    請仔細核對以下成功標準 (success_checks)：
+                    {json.dumps(proc.get("success_checks", []), ensure_ascii=False, indent=2)}
+
+                    如果你發現畫面已經完全符合上述標準（例如：字已經打上去了、檔案已經存了），你 **絕對不可以** 再做任何多餘的操作！
+                    你必須立刻輸出 "action": "advance_plan"。並直接前往下一個步驟或 procedure。
+                    不要因為「看起來還能做什麼」就繼續動作。
+
                     請只輸出 JSON，不要輸出其他文字。
 
                     輸出格式：
                     {{
+                    "screen_observation": "我現在畫面上看到了什麼",
+                    "are_success_checks_met": true 或 false,
                     "reasoning": "根據畫面與目前 step，我判斷...",
                     "action": "動作名稱",
                     "step_id": "目前要執行或完成的 step_id",
@@ -437,7 +501,7 @@ class VisionGuidedAgent:
 if __name__ == "__main__":
     agent = VisionGuidedAgent()
     
-    task = "開啟桌面的 test.txt，在最後面加上『AI 自動化執行測試』，儲存並關閉視窗。"
+    task = "請用點擊的方式打開桌面上的 test.txt，在最後面加上『AI 自動化執行測試』，儲存並關閉視窗。"
     
     params = {
         "file_path": "C:\\Users\\luhon\\Desktop\\test.txt", 

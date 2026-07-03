@@ -30,12 +30,14 @@ AGENT_USAGE_RULES = {
         "只能使用操作手冊中存在的 procedure id。",
         "不要自己發明 procedure id。",
         "如果任務要編輯檔案，通常需要 open_file。",
+        "在執行 add_text_to_end 或任何輸入文字的操作之前，必須先執行 focus_notepad_editor 以確保游標在正確位置。",
         "如果任務要追加文字，通常需要 add_text_to_end。",
         "如果任務要求保留修改，必須包含 save_file。",
         "如果任務要求最後關閉視窗，必須包含 close_notepad。",
         "handle_save_dialog 只在「可能出現儲存確認對話框」時放在 close_notepad 後面。",
         "不要加入低階 action，例如 hotkey、press_key、type_text。",
         "不要重複同一個 procedure，除非它是 recovery 用途。"
+
     ],
 
     "state_fields": {
@@ -168,14 +170,16 @@ NOTEPAD_PROCEDURES = [
         "use_when": [
             "使用者任務要求新增、追加、寫入或記錄一段文字。",
             "記事本已經開啟。",
-            "目標檔案已經是目前正在編輯的檔案。"
+            "目標檔案已經是目前正在編輯的檔案。",
+            "已經聚焦在記事本編輯區，或可以透過 focus_notepad_editor 聚焦。",
         ],
 
         "do_not_use_when": [
             "記事本尚未開啟。",
             "尚未指定要加入的文字。",
             "目前有儲存確認對話框擋住畫面。",
-            "指定文字已經成功加入過，且沒有失敗證據。"
+            "指定文字已經成功加入過，且沒有失敗證據。",
+            "沒有聚焦在記事本編輯區，請透過 focus_notepad_editor 聚焦。"
         ],
 
         "required_inputs": {
@@ -275,12 +279,7 @@ NOTEPAD_PROCEDURES = [
             {
                 "step_id": "click_editor_area",
                 "action": "click_relative",
-                "params": {
-                    "window": "notepad",
-                    "x_ratio": 0.5,
-                    "y_ratio": 0.5
-                },
-                "description": "點擊記事本視窗中央，讓焦點回到文字編輯區"
+                "description": "請觀察螢幕截圖，自行找出記事本『白色空白文字編輯區』的精確位置，並在輸出的 JSON 中填入對應的 x 與 y 座標來點擊它。"
             },
             {
                 "step_id": "wait_focus",
@@ -296,7 +295,8 @@ NOTEPAD_PROCEDURES = [
 
         "success_checks": [
             "記事本仍然是目前前景視窗",
-            "沒有對話框遮住記事本"
+            "沒有對話框遮住記事本",
+            "畫面中編輯的區域有出現一條直直的游標，表示可以輸入文字",
         ],
 
         "failure_signals": [
@@ -328,6 +328,7 @@ NOTEPAD_PROCEDURES = [
 
         "use_when": [
             "已經完成文字編輯，且需要保留變更。",
+            "這個筆記的上方的分頁右邊有圓形的點點，表示有未儲存變更，這個是記事本中確認是否儲存最好的方法。",
             "content_dirty == True。",
             "關閉記事本前。"
         ],
@@ -367,13 +368,14 @@ NOTEPAD_PROCEDURES = [
         "success_checks": [
             "沒有出現另存新檔視窗",
             "沒有出現錯誤對話框",
-            "content_dirty == False"
+            "content_dirty == False",
+            "這個檔案的上方的分頁會從圓形的點點變成叉叉，表示已經儲存",
         ],
 
         "failure_signals": [
             "出現另存新檔視窗",
             "出現權限錯誤",
-            "儲存後仍提示有未儲存變更"
+            "記事本上方分頁標籤文字旁邊的『圓形點點』依然存在，代表根本還沒存檔成功"
         ],
 
         "recovery_procedures": [
@@ -441,7 +443,8 @@ NOTEPAD_PROCEDURES = [
 
         "success_checks": [
             "記事本視窗消失",
-            "或出現儲存確認對話框並等待後續處理"
+            "或出現儲存確認對話框並等待後續處理",
+            "畫面上沒有記事本的視窗出現並且回到桌面",
         ],
 
         "failure_signals": [
@@ -495,16 +498,16 @@ NOTEPAD_PROCEDURES = [
         "steps": [
             {
                 "step_id": "detect_save_dialog",
-                "action": "check_image_exists",
+                "action": "check_element_exists",  # ← 改成 mainAgent.py 認得的
                 "params": "save_confirm_dialog",
                 "description": "檢查畫面上是否存在儲存確認對話框"
             },
             {
                 "step_id": "confirm_save_if_dialog_exists",
-                "action": "conditional_press_key",
-                "condition": "save_confirm_dialog exists",
+                "action": "press_key",  # ← 改成基本的 press_key
                 "params": "enter",
-                "description": "如果儲存確認對話框存在，按 Enter 選擇儲存"
+                "condition": "previous_step_found_dialog",  # 條件判斷移到 mainAgent 程式端處理
+                "description": "如果儲存確認對話框存在,按 Enter 選擇儲存"
             },
             {
                 "step_id": "wait_dialog_close",
