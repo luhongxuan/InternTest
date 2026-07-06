@@ -1,0 +1,255 @@
+# 會議紀錄：本地端通用電腦操作 Agent 方向調整
+
+## 一、會議背景
+
+原本專案方向是開發一個本地端 Agent，透過 Ollama、本地 Vision Model 與 PyAutoGUI 操作電腦，並先以「記事本操作」作為 Demo。
+
+原先規劃是透過 `notepad_manual.py`、`knowledge_base.py` 等方式，提供 Agent 一份操作手冊或 skill，讓它根據任務選擇 procedure 並執行，例如開啟檔案、輸入文字、儲存、關閉。
+
+但經過會議討論後，團隊對這個方向有新的想法與疑慮。
+
+## 二、會議中提出的新需求
+
+團隊目前更希望系統可以做到：
+
+讓 Agent 在沒有特定軟體文件、沒有預先寫好的 skill、沒有固定操作流程的情況下，也能在不同軟體中進行滑鼠與鍵盤操作。
+
+也就是說，新的方向更接近「通用電腦操作 Agent」，而不是「針對記事本或特定軟體寫好的自動化流程」。
+
+團隊擔心，如果每個軟體都要事先提供文件或 skill，會出現以下問題：
+
+1. 如果文件裡沒有寫到某個操作，Agent 可能就無法完成任務。
+2. 如果換到另一個軟體，就需要重新寫一份 skill 或操作手冊。
+3. 這樣系統的通用性不夠，會比較像特定軟體自動化，而不是一般化的電腦操作 Agent。
+
+因此，團隊希望研究的方向可能需要更接近 Claude Computer Use 或 OpenAI Operator 這類系統，也就是讓 Agent 透過觀察畫面，自行判斷下一步要用滑鼠或鍵盤做什麼。
+
+## 三、目前產生的疑問
+
+### 1. 如果全部交給 LLM，那我還能做什麼？
+
+目前的疑問是，如果不提供文件、不提供 skill，而是讓 LLM 自己看畫面操作，那專案中工程實作的部分會不會變少？
+
+初步整理後的想法是：LLM 只是負責「決策」，但仍然需要開發大量底層系統，包括：
+
+* 螢幕截圖與畫面觀察
+* 滑鼠與鍵盤控制
+* Agent loop
+* 執行結果回傳
+* 安全限制
+* 錯誤偵測與恢復
+* 操作紀錄
+* 任務成功率評估
+* 不同模型與不同觀察方式的比較
+
+所以實際上不是沒有開發空間，而是開發方向會從「寫記事本操作手冊」轉成「建立通用 Computer Use Framework」。
+
+### 2. 是否還需要寫 Python 操控程式？
+
+需要。
+
+即使不寫特定 skill，仍然需要一層程式負責執行模型輸出的動作。
+
+可能的流程是：
+
+```text
+擷取畫面
+↓
+LLM / Vision Model 判斷下一步
+↓
+輸出 action，例如 click、type、press、scroll
+↓
+Python / Extension / OS API 執行滑鼠鍵盤操作
+↓
+再次擷取畫面
+↓
+回傳結果給模型
+```
+
+因此，模型不會直接控制電腦，還是需要我們寫 execution layer。
+
+### 3. 如果要做成瀏覽器 extension，要怎麼操作？
+
+會議中有提到示範是在瀏覽器 extension 中進行，因此未來方向可能不只是 Python 腳本，而是做成瀏覽器 extension 或類似產品化介面。
+
+瀏覽器方向可以有兩種做法：
+
+第一種是純視覺操作，也就是只看截圖，再用滑鼠鍵盤操作。這比較接近人類操作，也比較接近 Claude Computer Use，但本地小模型可能不穩。
+
+第二種是讀取網頁元素，例如 DOM 或 accessibility tree，取得目前頁面上的按鈕、輸入框、連結等元素，再讓 Agent 決定要操作哪一個。這樣比較穩定，但團隊可能會擔心這變得像網頁自動化，而不是通用操作。
+
+目前比較可行的折衷方向是混合式：
+
+```text
+截圖觀察
++
+瀏覽器 accessibility tree / DOM 輔助
++
+滑鼠鍵盤實際操作
+```
+
+這樣不是針對特定網站寫死 selector，而是即時取得目前頁面的通用 UI 結構，讓 Agent 更容易理解畫面。
+
+## 四、目前可能的新專案定位
+
+可以把專案重新定義為：
+
+「本地端通用 Computer Use Agent Framework」
+
+目標不是寫一份記事本 skill，而是建立一套可以讓本地模型觀察畫面、決策、執行、驗證與記錄的通用框架。
+
+可能包含以下模組：
+
+### 1. Perception Layer：畫面理解層
+
+負責讓模型看得懂目前畫面。
+
+可能功能：
+
+* 螢幕截圖
+* 畫面縮放
+* OCR
+* UI 元件偵測
+* 瀏覽器 DOM / accessibility tree 解析
+* 將畫面中的按鈕、輸入框、連結編號
+
+### 2. Action Layer：操作執行層
+
+負責實際控制電腦。
+
+可能功能：
+
+* click
+* double click
+* type text
+* press key
+* hotkey
+* scroll
+* drag
+* wait
+* screenshot
+
+### 3. Agent Loop：決策迴圈
+
+負責整體流程：
+
+```text
+observe
+↓
+decide
+↓
+execute
+↓
+observe result
+↓
+continue / stop
+```
+
+### 4. Safety Layer：安全控制層
+
+因為使用場景是證券商，安全性很重要。
+
+可能功能：
+
+* 危險操作前確認
+* 禁止自動輸入密碼
+* 禁止送出交易或刪除資料
+* 限制只操作測試環境
+* 提供人工中止快捷鍵
+* 完整記錄操作過程
+
+### 5. Evaluation Layer：評估層
+
+負責衡量系統是否真的有效。
+
+可能指標：
+
+* 任務成功率
+* 平均執行時間
+* 平均操作步數
+* 失敗原因分類
+* 是否重複點擊
+* 是否誤操作
+* 不同模型比較
+* 純截圖 vs 截圖加 accessibility tree 的差異
+
+## 五、目前可行的技術路線
+
+### 路線一：純桌面 Computer Use
+
+使用 Python、PyAutoGUI、截圖與本地 Vision Model 操作任意桌面軟體。
+
+優點是最接近通用電腦操作。
+
+缺點是本地 7B / 8B 模型可能不夠穩，速度也比較慢。
+
+### 路線二：Browser Extension Agent
+
+先聚焦在瀏覽器環境，透過 extension 取得畫面、DOM 或 accessibility tree，再讓 Agent 操作瀏覽器。
+
+優點是比較容易做出穩定 demo。
+
+缺點是比較偏瀏覽器，不一定能代表所有桌面軟體。
+
+### 路線三：混合式架構
+
+同時支援：
+
+* screenshot-based control
+* browser accessibility tree / DOM 輔助
+* 滑鼠鍵盤實際操作
+
+這個方向目前最值得考慮，因為它兼顧通用性與穩定性。
+
+## 六、目前不建議的方向
+
+目前不建議一開始就嘗試「訓練一個像 Claude Computer Use 的模型」。
+
+原因：
+
+1. 需要大量畫面、動作、結果的訓練資料。
+2. 本地 7B / 8B 模型即使微調，也不一定能穩定學會通用 GUI 操作。
+3. 實習時間內比較適合做系統框架與實驗比較，而不是從零訓練一個大型 Computer Use 模型。
+
+比較務實的方向是：
+
+使用現有本地模型，搭配更好的畫面理解、工具設計、Agent loop、安全機制與評估方法，建立一個可展示的本地端 Computer Use 原型。
+
+## 七、目前可以做的事情
+
+接下來可以考慮做以下工作：
+
+1. 研究 Claude Computer Use、OpenAI Operator、GUI Agent 的架構概念。
+2. 將現有記事本 Agent 重構成通用 Computer Use Agent。
+3. 移除對 `notepad_manual.py` 的依賴，改成通用工具集。
+4. 建立基本 action schema，例如 click、type、press、scroll、wait。
+5. 建立 observation schema，例如 screenshot、OCR、UI elements。
+6. 嘗試 browser extension 或 Playwright / Chrome DevTools Protocol 取得網頁元素。
+7. 比較純 screenshot 與 accessibility tree 輔助的效果。
+8. 設計一組簡單任務做 benchmark，例如開網站、搜尋文字、填表、點按鈕。
+9. 建立操作 log 與錯誤分析。
+10. 加上安全限制與人工中止機制。
+
+## 八、目前暫定結論
+
+會議後的方向可以初步整理為：
+
+專案不再只是「記事本操作 Agent」，而是朝向「本地端通用電腦操作 Agent」發展。
+
+重點不是為每個軟體寫 skill，而是建立一個通用框架，讓本地模型可以透過畫面觀察與滑鼠鍵盤工具，在不同軟體中嘗試完成任務。
+
+但考量本地模型能力限制，完全只靠截圖操作任意軟體可能不穩，因此可以考慮混合式架構：
+
+```text
+通用滑鼠鍵盤控制
++
+截圖觀察
++
+瀏覽器 accessibility tree / DOM 輔助
++
+安全控制
++
+操作紀錄與評估
+```
+
+這樣既能符合團隊希望的「不要依賴固定 skill」，也能保留足夠的工程開發內容與實習成果。
