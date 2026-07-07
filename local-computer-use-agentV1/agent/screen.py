@@ -51,7 +51,7 @@ class ScreenManager:
         {image_b64, path, real_size, model_size, scale, phash}
         """
         with mss.mss() as sct:
-            mon = sct.monitors[self.monitor_index if self.monitor_index < len(sct.monitors) else 1]
+            mon = sct.monitors[1]
             shot = sct.grab(mon)
             img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
 

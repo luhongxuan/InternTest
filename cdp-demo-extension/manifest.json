@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "CDP Demo - 看懂 AI 怎麼操作瀏覽器",
+  "version": "1.0",
+  "description": "用最簡單的方式展示 Chrome DevTools Protocol 如何自動操作網頁",
+  "permissions": [
+    "debugger",
+    "activeTab",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CDP Demo"
+  },
+  "icons": {}
+}

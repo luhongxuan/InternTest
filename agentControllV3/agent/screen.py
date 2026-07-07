@@ -55,6 +55,7 @@ class ScreenManager:
             "image_base64": image_base64,
             "path": path,
             "scale": scale,
+            "model_size": (scale_width, scale_height),
             "phash": self._phash(scale_image)
         }
     

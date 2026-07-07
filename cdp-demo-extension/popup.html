@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 420px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 16px;
+  }
+  h1 {
+    font-size: 15px;
+    color: #7ec8e3;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 16px;
+  }
+
+  /* === Demo 選擇區 === */
+  .demo-section {
+    background: #16213e;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .demo-section h2 {
+    font-size: 12px;
+    color: #7ec8e3;
+    margin-bottom: 8px;
+  }
+  .demo-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    background: #0f3460;
+    color: #e0e0e0;
+    border: 1px solid #1a4a7a;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+    transition: background 0.15s;
+  }
+  .demo-btn:hover { background: #1a4a7a; }
+  .demo-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .demo-btn .label { font-weight: 600; }
+  .demo-btn .desc {
+    font-size: 11px;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  /* === Log 區 === */
+  .log-section {
+    background: #0a0a1a;
+    border-radius: 8px;
+    padding: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+  }
+  .log-entry {
+    padding: 2px 0;
+    border-bottom: 1px solid #1a1a2e;
+  }
+  .log-entry.step { color: #7ec8e3; }
+  .log-entry.cdp { color: #e6b800; }
+  .log-entry.action { color: #50fa7b; }
+  .log-entry.result { color: #bd93f9; }
+  .log-entry.error { color: #ff5555; }
+  .log-entry .tag {
+    display: inline-block;
+    min-width: 50px;
+    font-weight: 700;
+    margin-right: 6px;
+  }
+
+  .clear-btn {
+    margin-top: 8px;
+    background: none;
+    border: 1px solid #333;
+    color: #666;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+  .clear-btn:hover { color: #999; border-color: #555; }
+</style>
+</head>
+<body>
+
+<h1>CDP Demo Extension</h1>
+<p class="subtitle">展示 Chrome DevTools Protocol 如何自動操作網頁元素</p>
+
+<div class="demo-section">
+  <h2>選擇 Demo</h2>
+
+  <button class="demo-btn" id="demo1">
+    <div class="label">Demo 1：CDP 基本操作</div>
+    <div class="desc">打開測試頁面 → 用 CDP 找到輸入框 → 自動打字 → 點擊按鈕</div>
+  </button>
+
+  <button class="demo-btn" id="demo2">
+    <div class="label">Demo 2：讀取 Accessibility Tree</div>
+    <div class="desc">擷取當前頁面的 accessibility snapshot，看 AI 實際會收到什麼</div>
+  </button>
+
+  <button class="demo-btn" id="demo3">
+    <div class="label">Demo 3：DOM vs Accessibility 對比</div>
+    <div class="desc">同時顯示原始 DOM 節點數 vs Accessibility Tree 節點數</div>
+  </button>
+</div>
+
+<div class="log-section" id="log">
+  <div class="log-entry step">
+    <span class="tag">[等待]</span>點擊上方按鈕開始 demo
+  </div>
+</div>
+
+<button class="clear-btn" id="clearLog">清除 Log</button>
+
+<script src="popup.js"></script>
+</body>
+</html>

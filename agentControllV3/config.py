@@ -1,7 +1,10 @@
 """參數設定"""
 
+OLLAMA_HOST = "http://localhost:11434"
 PLANNER_MODEL = "qwen2.5:14b"
 VISION_MODEL = "qwen2.5vl:7b"
+REQUEST_TIMEOUT = 180
+MODEL_TEMPERATURE = 0.2
 
 MODEL_MAX_WIDTH = 1028
 
