@@ -1,0 +1,15 @@
+"""參數設定"""
+
+PLANNER_MODEL = "qwen2.5:14b"
+VISION_MODEL = "qwen2.5vl:7b"
+
+MODEL_MAX_WIDTH = 1028
+
+ACTION_DELAY = 0.6
+HISTORY_WINDOW = 5
+
+LOG_DIR = "logs"
+SCREENSHOT_DIR = "screenshots"
+
+BACKEND_HOST = "127.0.0.1"
+BACKEND_PORT = 8000

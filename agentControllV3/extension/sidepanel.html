@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Computer Use Agent</title>
+</head>
+<body>
+  <header id="topbar">
+    <div class="title">
+      <span class="dot" id="statusDot"></span>
+      Computer Use Agent
+    </div>
+    <div class="topbar-right">
+      <span id="stateChip" class="chip hidden"></span>
+      <button id="newChatBtn" class="icon-btn" title="開新任務" aria-label="開新任務">＋</button>
+    </div>
+  </header>
+
+  <!-- 執行時的即時畫面預覽（在對話上方，就地更新） -->
+  <div id="livePreview" class="live-preview hidden">
+    <img id="liveShot" alt="Agent 最新看到的畫面" />
+    <span class="live-label">Agent 目前看到的畫面</span>
+  </div>
+
+  <main id="messages" aria-live="polite">
+    <div class="msg agent">
+      <div class="bubble">
+        嗨，我是本地電腦操作 Agent。用一句話告訴我你想完成什麼，我會先擬一份計畫給你確認，你同意後才會動手。
+        <div class="hint">例如：點畫面中的搜尋框並輸入 hello</div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="composer">
+    <div id="modeChip" class="mode-chip hidden">
+      <span id="modeChipText"></span>
+      <button id="modeChipClear" aria-label="取消">✕</button>
+    </div>
+    <div class="composer-row">
+      <textarea id="input" rows="1" placeholder="輸入任務…"></textarea>
+      <button id="sendBtn" class="send-btn" aria-label="送出">↑</button>
+    </div>
+    <div class="composer-meta">
+      <span id="connText" class="conn-text off">後端未連線</span>
+    </div>
+  </footer>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
