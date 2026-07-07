@@ -58,6 +58,9 @@ class ScreenManager:
             "phash": self._phash(scale_image)
         }
     
+    def to_real_coordinates(self, x: int, y: int, scale) -> tuple[int, int]:
+        return int(round(x / scale)) + self.offset[0], int(round(y / scale)) + self.offset[1]   
+    
     def _phash(self, image: Image.Image) -> str:
         """"
         簡單的計算圖片的感知哈希值，用來判斷畫面是不是有變化
