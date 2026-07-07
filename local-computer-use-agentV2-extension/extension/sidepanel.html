@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Computer Use Agent</title>
+</head>
+<body>
+  <header>
+    <h1>Computer Use Agent</h1>
+    <span id="conn" class="badge off">後端未連線</span>
+  </header>
+
+  <section id="input-section">
+    <label for="task">任務</label>
+    <textarea id="task" rows="3" placeholder="例如：點擊畫面中的搜尋框並輸入 hello"></textarea>
+    <div class="row">
+      <label for="maxSteps">最大步數</label>
+      <input id="maxSteps" type="number" min="1" max="60" value="20" />
+    </div>
+    <button id="planBtn" class="primary">產生計畫</button>
+  </section>
+
+  <section id="plan-section" class="hidden">
+    <h2>計畫</h2>
+    <div id="safety" class="safety"></div>
+    <div id="summary" class="summary"></div>
+    <ol id="planSteps"></ol>
+    <img id="planShot" class="shot hidden" alt="Planner 看到的畫面" />
+    <div class="row">
+      <button id="approveBtn" class="primary">Approve 並執行</button>
+      <button id="reviseBtn">修改</button>
+      <button id="cancelBtn" class="danger">取消</button>
+    </div>
+    <div id="reviseBox" class="hidden">
+      <textarea id="reviseNote" rows="2" placeholder="修改意見，例如：只點搜尋框，不要輸入文字"></textarea>
+      <button id="reviseSubmit">重新產生計畫</button>
+    </div>
+  </section>
+
+  <section id="exec-section" class="hidden">
+    <h2>執行中 <span id="stateBadge" class="badge"></span></h2>
+    <div id="stepInfo" class="muted"></div>
+    <img id="liveShot" class="shot" alt="最新畫面" />
+    <div id="confirmBox" class="confirm hidden">
+      <p id="confirmMsg"></p>
+      <div class="row">
+        <button id="confirmYes" class="danger">允許</button>
+        <button id="confirmNo">拒絕</button>
+      </div>
+    </div>
+    <button id="stopBtn" class="danger">停止任務</button>
+    <h3>事件</h3>
+    <div id="events" class="events"></div>
+  </section>
+
+  <footer>
+    <small>操作由本地 Python 後端執行。緊急中止：滑鼠移到螢幕左上角。</small>
+  </footer>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
