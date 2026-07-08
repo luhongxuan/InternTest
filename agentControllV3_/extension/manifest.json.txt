@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Local Computer Use Agent",
+  "version": "0.1.0",
+  "description": "本地端通用電腦操作 Agent 的控制面板（前端），操作由本地 Python 後端執行。",
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": ["http://127.0.0.1:8000/*", "http://localhost:8000/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "開啟 Agent 控制面板" },
+  "side_panel": { "default_path": "sidepanel.html" }
+}
