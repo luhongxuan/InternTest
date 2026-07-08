@@ -36,7 +36,7 @@ class AgentLoop:
 
     def run(self, task: str) -> ExecutionResult:
         #guard = safety.LoopGuard(self.cfg.MAX_SAME_ACTION_REPEAT, self.cfg.MAX_NO_CHANGE)
-        plan_text = "雙擊打開vscode"
+        plan_text = "雙擊打開 visual studio code"
         consecutive_parse_fail = 0
         start_time = time.time()
         for step in range(1, 2):
@@ -92,4 +92,4 @@ if __name__ == "__main__":
     tools = ToolExecutor(screen_manager=screen, action_delay=0.5)
 
     loop = AgentLoop(client, screen, tools, model="qwen2.5vl:7b")
-    loop.run("雙擊打開vscode")
+    loop.run("雙擊打開 visual studio code")

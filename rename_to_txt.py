@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 # 目標資料夾
-TARGET_DIR = "agentControllV3_"
+TARGET_DIR = "cdp-demo-extension_"
 # 需要被偽裝的副檔名
 DANGEROUS_EXTS = ['.py', '.js', '.json', '.html', '.css']
 

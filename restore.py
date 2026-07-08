@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-TARGET_DIR = "agentControllV3"
+TARGET_DIR = "cdp-demo-extension"
 
 def unmask_extensions():
     target_path = Path(TARGET_DIR)
