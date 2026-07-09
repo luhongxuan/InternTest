@@ -1,7 +1,4 @@
 """執行迴圈：使用者 approve 後才會進到這裡。
-
-每一輪：截圖 -> 模型決定動作 -> schema 驗證 -> 安全檢查 -> 執行 -> 記錄。
-迴圈在 finish/fail/max_steps/重複/無變化/使用者中止 時停止。
 """
 
 import json
@@ -36,10 +33,11 @@ class AgentLoop:
 
     def run(self, task: str) -> ExecutionResult:
         #guard = safety.LoopGuard(self.cfg.MAX_SAME_ACTION_REPEAT, self.cfg.MAX_NO_CHANGE)
-        plan_text = "雙擊打開 visual studio code"
+        plan_text = task
         consecutive_parse_fail = 0
         start_time = time.time()
         for step in range(1, 2):
+            time.sleep(2)
 
             shot = self.screen.capture_screen()
 
@@ -92,4 +90,4 @@ if __name__ == "__main__":
     tools = ToolExecutor(screen_manager=screen, action_delay=0.5)
 
     loop = AgentLoop(client, screen, tools, model="qwen2.5vl:7b")
-    loop.run("雙擊打開 visual studio code")
+    loop.run("幫我點擊登入按鈕")

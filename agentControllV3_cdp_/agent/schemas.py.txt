@@ -1,4 +1,10 @@
 """嚴格的 action / plan schema 驗證。
+
+設計原則：
+- 白名單：模型只能使用這裡定義的 action，其他一律拒絕。
+- 每個 action 的必填欄位、型別都檢查。
+- 驗證通過後回傳「正規化」後的 action（補上 reason、修掉多餘欄位）。
+這能擋掉模型幻想出來的工具、亂帶參數、或想塞 python/shell 指令的情況。
 """
 
 from typing import Any, Dict, List, Tuple
@@ -19,6 +25,9 @@ ALLOWED_ACTIONS: Dict[str, List[str]] = {
     "fail_task": [],
     # 控制型 action：不改變電腦狀態，只是暫停並詢問使用者。
     "request_user_confirmation": [],
+    # --- CDP 瀏覽器層：用元素 id 操作，不猜座標 ---
+    "click_element": ["element_id"],
+    "type_in_element": ["element_id", "text"],
 }
 
 # 會實際改變電腦狀態的動作（planning 階段一律禁止；執行階段才允許）。
@@ -85,6 +94,17 @@ def validate_action(raw: Any) -> Tuple[bool, str, Dict[str, Any]]:
 
     elif name == "request_user_confirmation":
         action["message"] = str(raw.get("message", raw.get("reason", ""))).strip()
+
+    elif name in ("click_element", "type_in_element"):
+        eid = raw.get("element_id")
+        if not _is_int(eid):
+            return False, f"{name} 需要整數 element_id", {}
+        action["element_id"] = int(eid)
+        if name == "type_in_element":
+            text = raw.get("text")
+            if not isinstance(text, str):
+                return False, "type_in_element 需要字串 text", {}
+            action["text"] = text
 
     # screenshot / finish_task / fail_task 不需額外欄位
     print(action)

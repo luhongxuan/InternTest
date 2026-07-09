@@ -11,7 +11,7 @@ from typing import Dict, List
 
 import prompts
 import schemas
-# from agent.browser import BrowserCDP.\v   
+# from agent.browser import BrowserCDP
 # from agent.model_client import ModelClient
 #from agent import schemas
 
@@ -41,10 +41,8 @@ class AgentLoop:
 
     def run(self, task: str, plan_text: str = "") -> ExecutionResult:
         parse_fail = 0
-        start_time = time.time()
-        for step in range(1, 2):
+        for step in range(1, self.max_steps + 1):
             # --- 觀察：截圖 + 元素清單 ---
-            time.sleep(2)
             t0 = time.time()
             shot = self.browser.capture()
             observe_sec = time.time() - t0
@@ -95,8 +93,7 @@ class AgentLoop:
             print(f"  [result] {'ok' if result.get('ok') else 'FAIL: ' + str(result.get('error'))}")
             self.history.append({"action": action, "result": result})
             time.sleep(0.3)
-        end_time = time.time()
-        print(f"耗時 {end_time - start_time:.2f} 秒")
+
         return ExecutionResult("達到最大步數", self.max_steps)
 
 
@@ -107,7 +104,7 @@ if __name__ == "__main__":
     # 先用 Edge 開好 debugging port：
     #   msedge.exe --remote-debugging-port=9222 --user-data-dir=C:\edge-cdp
     client = OllamaClient(host="http://localhost:11434", timeout=180, temperature=0.2)
-    browser = BrowserCDP(host="127.0.0.1", port=9222, model_max_width=800)
+    browser = BrowserCDP(host="127.0.0.1", port=9222, model_max_width=1028)
 
     url, title = browser.get_url_title()
     print(f"目前分頁：{title} | {url}")

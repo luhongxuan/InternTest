@@ -1,4 +1,11 @@
 """Ollama 模型呼叫封裝。
+
+用 REST /api/chat，好處：
+- format="json" 可強制模型輸出合法 JSON，大幅降低解析失敗率。
+- 直接看得到 HTTP 內容，方便除錯。
+- 圖片用 messages[].images 傳 base64。
+
+對外只暴露 chat_json()，回傳 (parsed_dict_or_None, raw_text)。
 """
 
 import json
@@ -18,7 +25,7 @@ class OllamaClient:
             "model": model,
             "messages": messages,
             "stream": False,
-            "format": "json",
+            "format": "json",   # 強制 JSON 輸出
             "options": {"temperature": self.temperature},
         }
         resp = requests.post(f"{self.host}/api/chat", json=payload, timeout=self.timeout)
