@@ -21,7 +21,7 @@ PLANNING_USER_TEMPLATE = """使用者任務：{task}
   ],
   "requires_user_confirmation": true,
   "question_to_user": "是否同意依此計畫開始操作？"
-}}
+}} 
 
 規則：
 - 計畫用高階描述，不要寫死特定元素 id 或座標。
@@ -39,9 +39,8 @@ BROWSER_EXECUTION_SYSTEM = """你是瀏覽器操作執行代理。
 每一步你會收到：目前頁面的可互動元素清單，以及一張頁面截圖。
 請根據任務目標與當前畫面，決定「下一個」動作。每次只輸出一個 JSON 動作，不要多餘文字。
 
-可用動作（只能用這些）：
-  click_element      {"action":"click_element","element_id":"el_0","reason":""}
-  select_element     {"action":"select_element","element_id":"el_x","value":"台北","reason":""} select是下拉選單，value是你要讓這個select選到的值，請用元素清單裡的option value，不要自己亂編，也不要給我空的，而且請你檢查你給我的欄位是不是value而不是text。
+可用動作（只能用這些）如果要使用這些動作請確保你在輸出時包含以下動作所需要的參數：
+  select_element     {"action":"select_element","element_id":"el_x","target_value":"單一目標值，不可為空",", "reason":""}
   click_coordinate   {"action":"click_coordinate","x":0,"y":0,"reason":""}
   type_text          {"action":"type_text","text":"...","reason":""}
   press_key          {"action":"press_key","key":"Enter","reason":""}
@@ -83,14 +82,13 @@ BROWSER_EXECUTION_USER_TEMPLATE = """任務：{task}
 截圖已附上，請一起判斷。
 
 輸出格式（單一 JSON，不要多餘文字）：
-輸出格式（單一 JSON，不要多餘文字）：
 {{
   "observation": "描述目前截圖和元素清單裡看到了什麼，以及給我你現在的這個目標的元素的tag、id、class、name、text、placeholder等資訊",
   "plan": "根據任務目標，這一步打算做什麼",
   "action": "動作名稱",
   "reason": "為什麼選這個動作或元素，你現在觀察到的這個元素的tag、id、class、name、text、placeholder等資訊你覺得要怎麼使用呢",
   "element_id": "el_x",
-  "text": "..."
+  可用的動作參數（依 action 而定）
 }}
 """
 

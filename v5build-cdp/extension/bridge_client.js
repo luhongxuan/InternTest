@@ -93,6 +93,7 @@ async function captureScreenshot(tabId) {
 // 轉發命令給 content_observer.js
 // ---------------------------------------------------------------------------
 async function forwardToContentScript(tabId, commandType, params) {
+  console.log("[Bridge] forwardToContentScript tabId=", tabId, "cmd=", commandType);
   return new Promise((resolve) => {
     chrome.tabs.sendMessage(
       tabId,
@@ -118,6 +119,7 @@ async function forwardToContentScript(tabId, commandType, params) {
 // 處理來自 Python 的命令
 // ---------------------------------------------------------------------------
 async function handleCommand(msg) {
+  console.log("[Bridge] handleCommand received:", msg.command_type);
   const { command_id, command_type, params = {} } = msg;
   let result = {};
 

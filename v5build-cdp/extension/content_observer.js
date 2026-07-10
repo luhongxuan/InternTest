@@ -266,7 +266,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (!el) return sendResponse({ ok: false, error: `找不到 ${params.element_id}` });
       if (el.tagName.toLowerCase() !== "select") 
           return sendResponse({ ok: false, error: `${params.element_id} 不是 select 元素` });
-      el.value = params.value;
+      //console.log("select_element", params.element_id, params.value, el);
+          const options = Array.from(el.options);
+      const option = options.find(o => o.text === params.value || o.value === params.value);
+      if (!option) return sendResponse({ ok: false, error: `找不到選項 ${params.value}` });
+      
+      el.selectedIndex = option.index;
       el.dispatchEvent(new Event("change", { bubbles: true }));
       el.dispatchEvent(new Event("input", { bubbles: true }));
       sendResponse({ ok: true, selected: params.value });

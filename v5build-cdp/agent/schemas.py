@@ -67,11 +67,11 @@ def validate_action(raw: Any) -> Tuple[bool, str, Dict[str, Any]]:
         eid = raw.get("element_id")
         if not isinstance(eid, str) or not eid.strip():
             return False, "select_element 需要非空字串 element_id", {}
-        value = raw.get("value") or raw.get("text")
+        value = raw.get("option_text") or raw.get("value") or raw.get("text") or raw.get("target_value")
         if not isinstance(value, str):
             return False, "select_element 需要字串 value", {}
         action["element_id"] = eid.strip()
-        action["value"] = value
+        action["value"] = value.strip()
 
     elif name in ("click", "double_click", "right_click", "move_mouse"):
         x, y = raw.get("x"), raw.get("y")
