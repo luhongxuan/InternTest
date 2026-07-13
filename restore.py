@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-TARGET_DIR = "cdp-demo-extension"
+TARGET_DIR = "v5build-cdp"
 
 def unmask_extensions():
     target_path = Path(TARGET_DIR)

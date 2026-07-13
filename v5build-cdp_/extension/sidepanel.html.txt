@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Computer Use Agent</title>
+</head>
+<body>
+  <header id="topbar">
+    <div class="title">
+      <span class="dot" id="statusDot"></span>
+      Computer Use Agent
+    </div>
+    <div class="topbar-right">
+      <span id="stateChip" class="chip hidden"></span>
+      <button id="newChatBtn" class="icon-btn" title="開新任務">＋</button>
+    </div>
+  </header>
+
+  <!-- 連線狀態列 -->
+  <div class="status-bar">
+    <span class="dot" id="bridgeDot"></span>
+    <span id="bridgeText" class="conn-text off">Extension 未橋接</span>
+    <span style="margin-left:auto"></span>
+    <span id="connText" class="conn-text off">後端未連線</span>
+  </div>
+
+  <!-- 執行即時截圖預覽 -->
+  <div id="livePreview" class="live-preview hidden">
+    <img id="liveShot" alt="最新頁面截圖" />
+    <span class="live-label">Agent 目前看到的畫面</span>
+  </div>
+
+  <main id="messages" aria-live="polite">
+    <div class="msg agent">
+      <div class="bubble">
+        嗨，我是本地電腦操作 Agent（Browser DOM 模式）。<br>
+        請告訴我你想在瀏覽器裡完成什麼任務。
+        <div class="hint">例如：查詢台灣高鐵台北到台中明天 09:00 的班次</div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="composer">
+    <div class="composer-row">
+      <textarea id="input" rows="1" placeholder="輸入任務…"></textarea>
+      <button id="sendBtn" class="send-btn" aria-label="送出">↑</button>
+    </div>
+    <div class="composer-meta">
+      <span id="connText2" class="conn-text off" style="display:none"></span>
+    </div>
+  </footer>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
