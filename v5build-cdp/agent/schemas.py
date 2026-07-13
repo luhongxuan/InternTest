@@ -48,74 +48,77 @@ def validate_action(raw: Any) -> Tuple[bool, str, Dict[str, Any]]:
     name = raw.get("action")
     if name not in ALLOWED_ACTIONS:
         return False, f"未定義的 action: {name!r}", {}
-
-    action: Dict[str, Any] = {"action": name, "reason": str(raw.get("reason", "")).strip(), "observation": str(raw.get("observation", "")).strip(), "plan": str(raw.get("plan", "")).strip()}
+    print(raw)
+    action: Dict[str, Any] = {"action": name, "reason": str(raw.get("reason", "")).strip(), "observation": str(raw.get("observation", "")).strip(), "plan": str(raw.get("plan", "")).strip(),
+                              "params": raw.get("params", {}) if isinstance(raw.get("params"), dict) else {}}
 
     if name == "click_element":
-        eid = raw.get("element_id")
+        if not raw.get("params"):
+            raw["params"] = {"element_id": raw.get("element_id")}
+        eid = raw.get("params").get("element_id")
         if not isinstance(eid, str) or not eid.strip():
             return False, "click_element 需要非空字串 element_id", {}
-        action["element_id"] = eid.strip()
+        action["params"]["element_id"] = eid.strip()
 
     elif name == "click_coordinate":
         x, y = raw.get("x"), raw.get("y")
         if not (_is_int(x) and _is_int(y)):
             return False, "click_coordinate 需要整數 x, y", {}
-        action["x"], action["y"] = int(x), int(y)
+        action["params"]["x"], action["params"]["y"] = int(x), int(y)
     
     elif name == "select_element":
-        eid = raw.get("element_id")
+        eid = raw.get("params").get("element_id")
         if not isinstance(eid, str) or not eid.strip():
             return False, "select_element 需要非空字串 element_id", {}
-        value = raw.get("option_text") or raw.get("value") or raw.get("text") or raw.get("target_value")
+        value = raw.get("params").get("option_text") or raw.get("params").get("value") or raw.get("params").get("text") or raw.get("params").get("target_value")
         if not isinstance(value, str):
             return False, "select_element 需要字串 value", {}
-        action["element_id"] = eid.strip()
-        action["value"] = value.strip()
+        action["params"]["element_id"] = eid.strip()
+        action["params"]["target_value"] = value.strip()
 
     elif name in ("click", "double_click", "right_click", "move_mouse"):
         x, y = raw.get("x"), raw.get("y")
         if not (_is_int(x) and _is_int(y)):
             return False, f"{name} 需要整數 x, y", {}
-        action["x"], action["y"] = int(x), int(y)
+        action["params"]["x"], action["params"]["y"] = int(x), int(y)
 
     elif name == "type_text":
-        text = raw.get("text")
+        text = raw.get("params").get("text")
         if not isinstance(text, str):
             return False, "type_text 需要字串 text", {}
-        action["text"] = text
-        eid = raw.get("element_id")
+        action["params"]["text"] = text
+        eid = raw.get("params").get("element_id")
         if isinstance(eid, str) and eid.strip():
-            action["element_id"] = eid.strip()
+            action["params"]["element_id"] = eid.strip()
 
     elif name == "press_key":
-        key = raw.get("key")
+        key = raw.get("params").get("key")
         if not isinstance(key, str) or not key.strip():
             return False, "press_key 需要非空字串 key", {}
-        action["key"] = key.strip().lower()
+        action["params"]["key"] = key.strip().lower()
 
     elif name == "hotkey":
-        keys = raw.get("keys")
+        keys = raw.get("params").get("keys")
         if not (isinstance(keys, list) and keys and all(isinstance(k, str) for k in keys)):
             return False, "hotkey 需要字串陣列 keys", {}
-        action["keys"] = [k.strip().lower() for k in keys]
+        action["params"]["keys"] = [k.strip().lower() for k in keys]
 
     elif name == "scroll":
-        amount = raw.get("amount")
+        amount = raw.get("params").get("amount")
         if not _is_int(amount):
             return False, "scroll 需要整數 amount（正=上，負=下）", {}
-        action["amount"] = int(amount)
+        action["params"]["amount"] = int(amount)
 
     elif name == "wait":
-        sec = raw.get("seconds", 1)
+        sec = raw.get("params").get("seconds", 1)
         try:
             sec = float(sec)
         except (TypeError, ValueError):
             sec = 1.0
-        action["seconds"] = max(0.1, min(10.0, sec))
+        action["params"]["seconds"] = max(0.1, min(10.0, sec))
 
     elif name == "request_user_confirmation":
-        action["message"] = str(raw.get("message", raw.get("reason", ""))).strip()
+        action["params"]["message"] = str(raw.get("message", raw.get("reason", ""))).strip()
 
     return True, "", action
 

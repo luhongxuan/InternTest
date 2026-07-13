@@ -105,35 +105,35 @@ class BrowserActionExecutor:
         params: Dict[str, Any] = {}
 
         if name == ACTION_CLICK_ELEMENT:
-            self.logger.log(f"{ACTION_CLICK_ELEMENT}", action = action['element_id'])
-            params = {"element_id": action["element_id"]}
+            self.logger.log(f"{ACTION_CLICK_ELEMENT}", action = action['params']['element_id'])
+            params = {"element_id": action["params"]["element_id"]}
 
         elif name == ACTION_CLICK_COORDINATE:
-            self.logger.log(f"{ACTION_CLICK_COORDINATE}", x = action['x'], y = action['y'])
-            params = {"x": action["x"], "y": action["y"]}
+            self.logger.log(f"{ACTION_CLICK_COORDINATE}", x = action['params']['x'], y = action['params']['y'])
+            params = {"x": action["params"]["x"], "y": action["params"]["y"]}
 
         elif name == ACTION_SELECT_ELEMENT:
-            self.logger.log(f"{ACTION_SELECT_ELEMENT}", element_id = action['element_id'], value = action['value'])
-            params = {"element_id": action["element_id"], "value": action["value"]}
+            self.logger.log(f"{ACTION_SELECT_ELEMENT}", element_id = action['params']['element_id'], value = action['params']['target_value'])
+            params = {"element_id": action["params"]["element_id"], "value": action["params"]["target_value"]}
 
         elif name == ACTION_TYPE_TEXT:
-            self.logger.log(f"{ACTION_TYPE_TEXT}", text = action['text'])
+            self.logger.log(f"{ACTION_TYPE_TEXT}", text = action['params']['text'])
             params = {
-                "text": action["text"],
-                "element_id": action.get("element_id"),   # 可選，有的話先 focus
+                "text": action["params"]["text"],
+                "element_id": action["params"].get("element_id"),   # 可選，有的話先 focus
             }
 
         elif name == ACTION_PRESS_KEY:
-            self.logger.log(f"{ACTION_PRESS_KEY}", key = action['key'])
-            params = {"key": action["key"]}
+            self.logger.log(f"{ACTION_PRESS_KEY}", key = action['params']['key'])
+            params = {"key": action["params"]["key"]}
 
         elif name == ACTION_HOTKEY:
-            self.logger.log(f"{ACTION_HOTKEY}", keys = action['keys'])
-            params = {"keys": action["keys"]}
+            self.logger.log(f"{ACTION_HOTKEY}", keys = action['params']['keys'])
+            params = {"keys": action["params"]["keys"]}
 
         elif name == ACTION_SCROLL:
-            self.logger.log(f"{ACTION_SCROLL}", amount = action['amount'])
-            params = {"amount": action["amount"]}
+            self.logger.log(f"{ACTION_SCROLL}", amount = action['params']['amount'])
+            params = {"amount": action["params"]["amount"]}
 
         else:
             self.logger.log("[BrowserExecutor] 不支援的 action: %s", name)
