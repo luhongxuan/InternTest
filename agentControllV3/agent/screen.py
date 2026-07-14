@@ -10,6 +10,12 @@ import time
 import mss
 from PIL import Image
 
+import ctypes
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+except Exception:
+    pass
+
 class ScreenManager:
     def __init__(self, model_max_width: int = 1280, screenshot_dir: str = "screenshots"):
         self.sct = mss.MSS()

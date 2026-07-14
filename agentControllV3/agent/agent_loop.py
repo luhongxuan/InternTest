@@ -40,6 +40,7 @@ class AgentLoop:
             time.sleep(2)
 
             shot = self.screen.capture_screen()
+            print(f"[loop] step={step} screen={shot['model_size']} scale={shot['scale']:.2f} ")
 
             # 呼叫模型
             mw, mh = shot["model_size"]
@@ -90,4 +91,4 @@ if __name__ == "__main__":
     tools = ToolExecutor(screen_manager=screen, action_delay=0.5)
 
     loop = AgentLoop(client, screen, tools, model="qwen2.5vl:7b")
-    loop.run("幫我點擊登入按鈕")
+    loop.run("幫我點擊 好手氣")

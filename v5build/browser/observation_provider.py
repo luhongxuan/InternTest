@@ -110,7 +110,7 @@ def _parse_observation(raw: Dict[str, Any], screenshot_dir: str) -> BrowserObser
             os.makedirs(screenshot_dir, exist_ok=True)
             ts = time.strftime("%Y%m%d_%H%M%S")
             screenshot_path = os.path.join(screenshot_dir, f"browser_{ts}.png")
-            img_model.save(screenshot_path)
+            #img_model.save(screenshot_path)
             # base64 供模型
             buf = io.BytesIO()
             img_model.save(buf, format="PNG")

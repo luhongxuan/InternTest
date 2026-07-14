@@ -100,6 +100,7 @@ type_text：
   "observation": "目前畫面觀察",
   "plan": "這一步打算完成什麼",
   "action": "type_text",
+  "element_id": "el_x",
   "text": "要輸入的文字",
   "reason": "為什麼輸入這段文字"
 }
@@ -213,6 +214,7 @@ click_coordinate params:
 
 type_text params:
 {{
+  "element_id": "el_x",
   "text": "要輸入的文字"
 }}
 

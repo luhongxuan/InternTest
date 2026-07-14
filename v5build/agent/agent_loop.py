@@ -110,21 +110,32 @@ class AgentLoop:
                 if obs_result is not None:          # 觀察失敗，直接回傳
                     return obs_result
                 obs = self._last_obs           # _observe_browser 設定的暫存
-                image_b64 = obs.screenshot_base64 or None
-                system_prompt = prompts.BROWSER_EXECUTION_SYSTEM
+                #image_b64 = obs.screenshot_base64 or None
+                shot = self.screen.capture_screen()
+                print(f"Step {step}: Captured screenshot for model input, size={shot['model_size']}, scale={shot['scale']}")
+                nc = guard.record_screen(shot["phash"])
+                if nc:
+                    self._set_state(TaskState.FAILED)
+                    self.logger.log("stop", step=step, reason=nc)
+                    return ExecutionResult(self.state, nc, step)
+
+                mw, mh = shot["model_size"]
+                image_b64 = shot["image_base64"]
+
+                system_prompt = prompts.EXECUTION_SYSTEM
                 from browser.observation_provider import format_elements_for_prompt
-                user_prompt = prompts.build_browser_execution_user(
-                    task=task,
-                    plan=plan_steps,
-                    current_step=step,
-                    history_text=self._history_text(),
-                    page_url=obs.page_url,
-                    page_title=obs.page_title,
-                    elements_text=format_elements_for_prompt(obs.elements),
-                    screenshot_width=obs.screenshot_width,
-                    screenshot_height=obs.screenshot_height,
+                user_prompt = prompts.build_execution_user(
+                    task = task,
+                    plan_text = "",
+                    # current_step = step,
+                    history_text = self._history_text(),
+                    # page_url = obs.page_url,
+                    # page_title = obs.page_title,
+                    # elements_text = format_elements_for_prompt(obs.elements),
+                    w = mw,
+                    h = mh,
                 )
-                screen_hash = obs.screenshot_path   # browser 模式用截圖路徑當 hash key
+                #screen_hash = obs.screenshot_path   # browser 模式用截圖路徑當 hash key
 
                 self.logger.log(
                     "browser_observation",
@@ -133,32 +144,32 @@ class AgentLoop:
                     page_title=obs.page_title,
                     elements_count=len(obs.elements),
                     screenshot_path=obs.screenshot_path,
-                    ws_connected=self.action_executor.bridge.is_connected if self.action_executor else False,
+                    #ws_connected=self.action_executor.bridge.is_connected if self.action_executor else False,
                     observation=[vars(e) | {"bounds": vars(e.bounds)} for e in obs.elements],
                 )
-            else:
-                shot = self.screen.capture(tag=f"step{step:02d}")
-                nc = guard.record_screen(shot["phash"])
-                if nc:
-                    self._set_state(TaskState.FAILED)
-                    self.logger.log("stop", step=step, reason=nc)
-                    return ExecutionResult(self.state, nc, step)
+            # else:
+            #     shot = self.screen.capture(tag=f"step{step:02d}")
+            #     nc = guard.record_screen(shot["phash"])
+            #     if nc:
+            #         self._set_state(TaskState.FAILED)
+            #         self.logger.log("stop", step=step, reason=nc)
+            #         return ExecutionResult(self.state, nc, step)
 
-                mw, mh = shot["model_size"]
-                image_b64 = shot["image_b64"]
-                system_prompt = prompts.EXECUTION_SYSTEM
-                user_prompt = prompts.build_execution_user(
-                    task, plan_text, self._history_text(), mw, mh
-                )
-                screen_hash = shot["phash"]
+            #     mw, mh = shot["model_size"]
+            #     image_b64 = shot["image_b64"]
+            #     system_prompt = prompts.EXECUTION_SYSTEM
+            #     user_prompt = prompts.build_execution_user(
+            #         task, plan_text, self._history_text(), mw, mh
+            #     )
+            #     screen_hash = shot["phash"]
 
-                self.logger.log(
-                    "screenshot_observation",
-                    step=step,
-                    screenshot=shot["path"],
-                    screen_real=shot["real_size"],
-                    screen_model=shot["model_size"],
-                )
+            #     self.logger.log(
+            #         "screenshot_observation",
+            #         step=step,
+            #         screenshot=shot["path"],
+            #         screen_real=shot["real_size"],
+            #         screen_model=shot["model_size"],
+            #     )
 
             # ---- 模型推論 ----
             parsed, raw = self.client.chat_json(
@@ -189,6 +200,7 @@ class AgentLoop:
                 print(f"[!] 非法 action：{err}")
                 self.history.append({"action": {"action": "invalid", "reason": err},
                                      "result": {"ok": False, "error": err}})
+                print(f"[!] 原始輸出：{raw[:300]}")
                 continue
 
             print(f"[action] {action['action']}  reason={action.get('reason', '')}")
@@ -235,7 +247,7 @@ class AgentLoop:
                 continue
 
             # ---- 執行 ----
-            if self.observation_mode == OBSERVATION_MODE_BROWSER and self.action_executor:
+            if False and self.observation_mode == OBSERVATION_MODE_BROWSER and self.action_executor:
                 import asyncio
                 result = await self.action_executor.execute(action)
             else:

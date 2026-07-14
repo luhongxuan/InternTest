@@ -67,10 +67,11 @@ def validate_action(raw: Any) -> Tuple[bool, str, Dict[str, Any]]:
         action["params"]["x"], action["params"]["y"] = int(x), int(y)
     
     elif name == "select_element":
-        eid = raw.get("params").get("element_id")
+        params = raw.get("params", {})
+        eid = params.get("element_id") or raw.get("element_id")
         if not isinstance(eid, str) or not eid.strip():
             return False, "select_element 需要非空字串 element_id", {}
-        value = raw.get("params").get("option_text") or raw.get("params").get("value") or raw.get("params").get("text") or raw.get("params").get("target_value")
+        value = params.get("target_value") or raw.get("target_value")
         if not isinstance(value, str):
             return False, "select_element 需要字串 value", {}
         action["params"]["element_id"] = eid.strip()
@@ -83,11 +84,12 @@ def validate_action(raw: Any) -> Tuple[bool, str, Dict[str, Any]]:
         action["params"]["x"], action["params"]["y"] = int(x), int(y)
 
     elif name == "type_text":
-        text = raw.get("params").get("text")
+        params = raw.get("params", {})
+        text = params.get("text") or raw.get("text")
         if not isinstance(text, str):
             return False, "type_text 需要字串 text", {}
         action["params"]["text"] = text
-        eid = raw.get("params").get("element_id")
+        eid = params.get("element_id") or raw.get("element_id")
         if isinstance(eid, str) and eid.strip():
             action["params"]["element_id"] = eid.strip()
 

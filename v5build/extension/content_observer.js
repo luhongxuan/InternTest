@@ -253,9 +253,58 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true; // 非同步
   }
 
+  if (command_type === "get_element_screen_position") {
+    const el = _elementRegistry.get(params.element_id);
+    if (!el) return sendResponse({ ok: false, error: `找不到 ${params.element_id}` });
+    
+    const rect = el.getBoundingClientRect();
+    const cx = Math.round(rect.left + rect.width / 2);
+    const cy = Math.round(rect.top + rect.height / 2);
+    
+    // 轉換成螢幕絕對座標
+    const borderX = Math.round((window.outerWidth - window.innerWidth) / 2);
+    const toolbarH = Math.round(window.outerHeight - window.innerHeight - borderX);
+    
+    const screenX = Math.round(window.screenX + borderX + cx);
+    const screenY = Math.round(window.screenY + toolbarH + cy);
+    
+    sendResponse({ ok: true, screen_x: screenX, screen_y: screenY, css_x: cx, css_y: cy });
+    console.log({
+      outerWidth: window.outerWidth,
+      innerWidth: window.innerWidth,
+      outerHeight: window.outerHeight,
+      innerHeight: window.innerHeight,
+      screenX: window.screenX,
+      screenY: window.screenY,
+      borderX: Math.round((window.outerWidth - window.innerWidth) / 2),
+      toolbarH: Math.round(window.outerHeight - window.innerHeight - Math.round((window.outerWidth - window.innerWidth) / 2)),
+    })
+    return true;
+  }
+
+  console.log(command_type);
+  console.log(command_type === "select_element");
+
   if (command_type === "click_element") {
     sendResponse(executeClickElement(params.element_id));
     return true;
+  }
+
+  if (command_type === "select_element") {
+      const el = _elementRegistry.get(params.element_id);
+      if (!el) return sendResponse({ ok: false, error: `找不到 ${params.element_id}` });
+      if (el.tagName.toLowerCase() !== "select") 
+          return sendResponse({ ok: false, error: `${params.element_id} 不是 select 元素` });
+      //console.log("select_element", params.element_id, params.value, el);
+          const options = Array.from(el.options);
+      const option = options.find(o => o.text === params.value || o.value === params.value);
+      if (!option) return sendResponse({ ok: false, error: `找不到選項 ${params.value}` });
+      
+      el.selectedIndex = option.index;
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      sendResponse({ ok: true, selected: params.value });
+      return true;
   }
 
   if (command_type === "type_text") {

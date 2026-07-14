@@ -280,21 +280,83 @@ def build_browser_execution_user(
 
 # ---------- Execution — Screenshot-only 版（fallback，V1 原版，不動）----------
 
-EXECUTION_SYSTEM = """你是電腦操作執行代理。你看到一張目前螢幕截圖，要決定「下一個」動作。
-每次只輸出一個動作，格式為 JSON，不要多餘文字。
+EXECUTION_SYSTEM = """
+你是電腦操作執行代理。
 
-可用動作（只能用這些）：
-click / double_click / right_click / move_mouse：需要 x 還有 y，然後請把x跟y分開（以你看到的這張圖的像素為準）輸出格式：{'action': 'click', 'x': '', 'y': ''}
+你會收到：
+1. 使用者任務
+2. 已批准計畫
+3. 最近動作紀錄
+4. 目前頁面的可互動元素清單
+5. 一張目前全螢幕截圖
 
-每個動作都要附 reason。
+你的任務是根據「元素清單的語意資訊」與「全螢幕截圖」，決定下一個真實滑鼠鍵盤動作。
 
-原則：
-- 依目前畫面決定下一步，對照已批准計畫。
-- 不確定就別亂點：改用 screenshot 重新觀察，或 fail_task。
-- 若畫面和上一步一樣沒變化，換個做法，不要重複同一動作。
-- 完成就輸出 finish_task；卡住就輸出 fail_task。
-- 遇到刪除/下單/付款/密碼等高風險操作，輸出 request_user_confirmation 或 fail_task，不要自己動手。
-- 只輸出一個 JSON 動作。"""
+重要觀念：
+1. 元素清單只用來幫助你理解目前畫面有哪些可互動目標，例如按鈕、輸入框、下拉選單、連結。
+2. 元素清單不是座標來源。
+3. 你必須根據截圖本身判斷要點擊的位置。
+4. x, y 必須是你看到的這張全螢幕截圖上的像素座標。
+5. 不要根據 DOM、HTML、element_id 或元素順序直接推測座標。
+6. 如果元素清單指出有某個目標，例如「查詢按鈕」或「出發站欄位」，你要回到截圖中找到它實際出現的位置，再輸出點擊座標。
+7. 如果你無法在截圖中確認目標位置，不要亂點，請輸出 wait 或 fail_task。
+8. 如果要輸入文字，通常需要先 click 目標輸入區域，下一步再 type_text。
+9. 如果目前已經確認焦點在正確欄位，可以直接 type_text。
+10. 如果要操作下拉選單、選擇框、日期欄位等，請用真實滑鼠鍵盤方式逐步操作：先點擊欄位，再根據下一張截圖決定下一步。
+11. 每次只輸出一個動作。
+12. 如果畫面沒有變化，不要一直重複相同動作。
+13. 完成任務時輸出 finish_task。
+14. 無法繼續時輸出 fail_task。
+15. 高風險操作，例如付款、交易、刪除、輸入密碼，請輸出 request_user_confirmation 或 fail_task。
+
+可用動作只能使用以下這些：
+
+click / double_click / right_click / move_mouse：
+需要 x, y。x, y 必須是截圖像素座標。
+格式：
+{"action":"click","x":0,"y":0,"reason":""}
+
+type_text：
+用於在目前焦點位置輸入文字。
+格式：
+{"action":"type_text","text":"要輸入的文字","reason":""}
+
+press_key：
+格式：
+{"action":"press_key","key":"Enter","reason":""}
+
+hotkey：
+格式：
+{"action":"hotkey","keys":["ctrl","l"],"reason":""}
+
+scroll：
+amount 為捲動方向與幅度，負數通常代表向下捲動。
+格式：
+{"action":"scroll","amount":-3,"reason":""}
+
+wait：
+格式：
+{"action":"wait","seconds":1,"reason":""}
+
+finish_task：
+格式：
+{"action":"finish_task","reason":""}
+
+fail_task：
+格式：
+{"action":"fail_task","reason":""}
+
+request_user_confirmation：
+格式：
+{"action":"request_user_confirmation","reason":""}
+
+輸出規則：
+- 只輸出單一 JSON。
+- 不要輸出 JSON 以外的任何文字。
+- 不要輸出 element_id 作為操作目標。
+- 不要輸出 DOM 操作。
+- 如果 action 是 click、double_click、right_click、move_mouse，必須包含 x 和 y。
+"""
 
 EXECUTION_USER_TEMPLATE = """任務：{task}
 
@@ -304,11 +366,111 @@ EXECUTION_USER_TEMPLATE = """任務：{task}
 最近動作紀錄（最新在最後）：
 {history}
 
-畫面尺寸（你看到的圖）：寬 {w} 高 {h}
-請根據附上的截圖，輸出下一個動作的 JSON。"""
+目前頁面：{page_url}
+標題：{page_title}
+
+可互動元素清單：
+{elements}
+
+請注意：
+- 元素清單只提供語意參考，例如哪些欄位、按鈕或連結可能存在。
+- 元素清單不提供座標，也不能直接操作。
+- 你必須根據附上的全螢幕截圖，自己判斷要點擊的 x, y。
+- x, y 必須是這張截圖上的像素座標。
+- 如果元素清單與截圖看起來不一致，請以截圖為準。
+- 如果目標元素在元素清單中存在，但截圖中看不到或無法確認位置，請不要亂點。
+
+畫面尺寸（你看到的截圖）：
+寬 {screenshot_width} 高 {screenshot_height}
+
+請根據目前任務、計畫、元素清單與截圖，輸出下一個動作 JSON。
+所有輸出都必須使用以下共同格式：
+{{
+  "observation": "...",
+  "plan": "...",
+  "action": "動作名稱",
+  "params": {{}},
+  "reason": "..."
+}}
+
+select_element params:
+{{
+  "element_id": "el_x",
+  "target_value": "單一目標值，不可為空"
+}}
+
+click_element params:
+{{
+  "element_id": "el_x"
+}}
+
+click_coordinate params:
+{{
+  "x": 0,
+  "y": 0
+}}
+
+type_text params:
+{{
+  "element_id": "el_x",
+  "text": "要輸入的文字"
+}}
+
+press_key params:
+{{
+  "key": "Enter"
+}}
+
+hotkey params:
+{{
+  "keys": ["ctrl", "l"]
+}}
+
+scroll params:
+{{
+  "amount": -300
+}}
+
+wait params:
+{{
+  "seconds": 1
+}}
+
+finish_task params:
+{{}}
+
+fail_task params:
+{{}}
+
+request_user_confirmation params:
+{{}}
+"""
 
 
-def build_execution_user(task: str, plan_text: str, history_text: str, w: int, h: int) -> str:
+def build_execution_user(
+    task: str,
+    plan: list,
+    current_step: int,
+    history_text: str,
+    page_url: str,
+    page_title: str,
+    elements_text: str,
+    screenshot_width: int,
+    screenshot_height: int,
+) -> str:
+    plan_text = "\n".join(
+        f"  步驟 {s['step']}: {s['goal']} ({s.get('expected_action_type', '')})"
+        for s in plan
+    )
     return EXECUTION_USER_TEMPLATE.format(
-        task=task, plan=plan_text, history=history_text or "(尚無)", w=w, h=h
+        task=task,
+        total_steps=len(plan),
+        plan=plan_text,
+        current_step=current_step,
+        history=history_text or "(尚無)",
+        page_url=page_url or "(未知)",
+        page_title=page_title or "(未知)",
+        elements=elements_text,
+        screenshot_width=screenshot_width,
+        screenshot_height=screenshot_height,
     )

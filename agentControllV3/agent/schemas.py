@@ -46,6 +46,7 @@ def validate_action(raw: Any) -> Tuple[bool, str, Dict[str, Any]]:
     # 逐欄位型別檢查
     if name in ("click", "double_click", "right_click", "move_mouse"):
         x, y = raw.get("x"), raw.get("y")
+        x = x.split(",")[0]
         # if not (_is_int(x) and _is_int(y)):
         #     return False, f"{name} 需要整數 x, y", {}
         action["x"], action["y"] = int(x), int(y)

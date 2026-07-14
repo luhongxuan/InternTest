@@ -96,8 +96,8 @@ class LoopGuard:
         else:
             self._repeat_count = 1
             self._last_sig = sig
-        if self._repeat_count >= self.max_repeat:
-            return f"同一動作連續重複 {self._repeat_count} 次，中止避免卡死"
+        # if self._repeat_count >= self.max_repeat:
+        #     return f"同一動作連續重複 {self._repeat_count} 次，中止避免卡死"
         return None
 
     def record_screen(self, screen_hash: str) -> Optional[str]:

@@ -34,71 +34,46 @@ MOCK_THSR_PLAN = {
   "plan": [
     {
       "step": 1,
-      "goal": "觀察目前瀏覽器畫面，確認是否已經在高鐵官方網站或高鐵班次查詢頁面。",
-      "expected_action_type": "screenshot"
-    },
-    {
-      "step": 2,
-      "goal": "如果目前不在高鐵查詢頁面，使用瀏覽器網址列或搜尋引擎搜尋並開啟台灣高鐵官方班次查詢頁面。",
-      "expected_action_type": "hotkey"
-    },
-    {
-      "step": 3,
-      "goal": "輸入或搜尋台灣高鐵班次查詢頁面關鍵字，並進入正確的查詢頁面。",
-      "expected_action_type": "type_text"
-    },
-    {
-      "step": 4,
       "goal": "觀察頁面，確認目前已進入高鐵班次查詢頁面，並找到出發站、抵達站、日期、時間與查詢按鈕等可互動元素。",
       "expected_action_type": "screenshot"
     },
     {
-      "step": 5,
-      "goal": "點擊或操作出發站的下拉式選單，準備選擇台北作為出發站。",
-      "expected_action_type": "click"
+      "step": 2,
+      "goal": "操作出發站的下拉式選單，準備選擇台北作為出發站。",
+      "expected_action_type": "select_element"
     },
     {
-      "step": 6,
-      "goal": "在出發站下拉式選單中選擇台北。",
-      "expected_action_type": "click"
+      "step": 3,
+      "goal": "操作抵達站的下拉式選單，準備選擇台中作為抵達站。",
+      "expected_action_type": "select_element"
     },
     {
-      "step": 7,
-      "goal": "點擊或操作抵達站的下拉式選單，準備選擇台中作為抵達站。",
-      "expected_action_type": "click"
-    },
-    {
-      "step": 8,
-      "goal": "在抵達站下拉式選單中選擇台中。",
-      "expected_action_type": "click"
-    },
-    {
-      "step": 9,
+      "step": 4,
       "goal": "點擊日期欄位，選擇明天的日期。",
       "expected_action_type": "click"
     },
     {
-      "step": 10,
+      "step": 5,
       "goal": "點擊時間欄位，輸入或選擇上午 09:00 左右的出發時間。",
       "expected_action_type": "click"
     },
     {
-      "step": 11,
+      "step": 6,
       "goal": "在時間欄位輸入 09:00，或選擇接近 09:00 的時間選項。",
       "expected_action_type": "type_text"
     },
     {
-      "step": 12,
+      "step": 7,
       "goal": "點擊查詢按鈕，送出班次查詢。",
       "expected_action_type": "click"
     },
     {
-      "step": 13,
+      "step": 8,
       "goal": "觀察查詢結果頁面，確認是否已顯示台北到台中、明天上午 09:00 左右出發的高鐵班次。",
       "expected_action_type": "screenshot"
     },
     {
-      "step": 14,
+      "step": 9,
       "goal": "如果畫面已顯示符合條件的班次資訊，整理目前查詢結果並結束任務。",
       "expected_action_type": "finish_task"
     }
@@ -212,11 +187,11 @@ class SessionRunner:
                 bridge=self.bridge,
                 screenshot_dir=config.SCREENSHOT_DIR,
             )
-            act_executor = BrowserActionExecutor(
-                bridge=self.bridge,
-                logger=s.run_logger,
-                action_delay=config.ACTION_DELAY,
-            )
+            # act_executor = BrowserActionExecutor(
+            #     bridge=self.bridge,
+            #     logger=s.run_logger,
+            #     action_delay=config.ACTION_DELAY,
+            # )
         else:
             obs_provider = None
             act_executor = None
@@ -241,7 +216,7 @@ class SessionRunner:
             cfg=config,
             confirm_fn=confirm_fn,
             observation_provider=obs_provider,
-            action_executor=act_executor,
+            action_executor=tool_executor,
             observation_mode=observation_mode,
         )
 

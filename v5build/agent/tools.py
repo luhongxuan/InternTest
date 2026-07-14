@@ -14,7 +14,7 @@ import pyperclip
 
 # 滑鼠移到左上角可緊急中止（pyautogui 內建 failsafe）。
 pyautogui.FAILSAFE = True
-pyautogui.PAUSE = 0.0  # 我們自己控制延遲
+pyautogui.PAUSE = 0.3  # 我們自己控制延遲
 
 
 class ToolExecutor:
@@ -44,7 +44,7 @@ class ToolExecutor:
 
     def _dispatch(self, name: str, action: Dict[str, Any], scale: float) -> Dict[str, Any]:
         if name in ("click", "double_click", "right_click", "move_mouse"):
-            rx, ry = self.screen.to_real_coords(action["x"], action["y"], scale)
+            rx, ry = self.screen.to_real_coordinates(action["params"]["x"], action["params"]["y"], scale)
             rx, ry = self._clamp(rx, ry)
             pyautogui.moveTo(rx, ry, duration=0.1)
             if name == "click":
@@ -56,7 +56,7 @@ class ToolExecutor:
             return {"real_coords": (rx, ry)}
 
         if name == "type_text":
-            text = action["text"]
+            text = action["params"].get("text") or action.get("text")
             try:
                 pyperclip.copy(text)
                 pyautogui.hotkey("ctrl", "v")
@@ -65,20 +65,20 @@ class ToolExecutor:
             return {"typed_len": len(text)}
 
         if name == "press_key":
-            pyautogui.press(action["key"])
-            return {"key": action["key"]}
+            pyautogui.press(action["params"].get("key") or action.get("key"))
+            return {"key": action["params"].get("key") or action.get("key")}
 
         if name == "hotkey":
-            pyautogui.hotkey(*action["keys"])
-            return {"keys": action["keys"]}
+            pyautogui.hotkey(*action["params"].get("keys", []) or action.get("keys", []))
+            return {"keys": action["params"].get("keys", []) or action.get("keys", [])}
 
         if name == "scroll":
-            pyautogui.scroll(action["amount"] * 100)
-            return {"amount": action["amount"]}
+            pyautogui.scroll(action["params"].get("amount") or action.get("amount") * 100)
+            return {"amount": action["params"].get("amount") or action.get("amount")}
 
         if name == "wait":
-            time.sleep(action.get("seconds", 1))
-            return {"waited": action.get("seconds", 1)}
+            time.sleep(action["params"].get("seconds") or action.get("seconds", 1))
+            return {"waited": action["params"].get("seconds") or action.get("seconds", 1)}
 
         # screenshot / finish_task / fail_task / request_user_confirmation
         # 這些不在此處產生實際 OS 操作，由 agent_loop 處理。

@@ -43,6 +43,7 @@ class ToolExecutor:
             rx, ry = self._clamp(rx, ry)
             pyautogui.moveTo(rx, ry, duration=0.1)
             if name == "click":
+                print(f"點擊: {rx}, {ry}")
                 pyautogui.click(rx, ry)
             elif name == "double_click":
                 pyautogui.doubleClick(rx, ry)

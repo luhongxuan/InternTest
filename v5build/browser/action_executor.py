@@ -6,6 +6,7 @@ agent loop 只依賴通用的 action schema，不綁死任何執行方式。
 
 支援的 action（瀏覽器層）：
     click_element       — 由 Extension JS 找到 element_id 對應元素執行 .click()
+    select_element      — 選擇下拉選單中的選項
     type_text           — 在目前 focus 元素輸入文字（或傳 element_id 先 focus）
     press_key           — 送 KeyboardEvent
     hotkey              — 送組合鍵 KeyboardEvent
@@ -23,6 +24,7 @@ import logging
 import time
 from typing import Any, Dict, Optional
 
+from agent.tools import ToolExecutor
 from agent.logger import RunLogger
 from browser.observation_provider import BrowserBridgeManager
 
@@ -31,6 +33,7 @@ logger = logging.getLogger(__name__)
 # action 名稱常數，避免 magic string
 ACTION_CLICK_ELEMENT = "click_element"
 ACTION_CLICK_COORDINATE = "click_coordinate"
+ACTION_SELECT_ELEMENT = "select_element"
 ACTION_TYPE_TEXT = "type_text"
 ACTION_PRESS_KEY = "press_key"
 ACTION_HOTKEY = "hotkey"
@@ -50,8 +53,9 @@ class BrowserActionExecutor:
     若 bridge 未連線，回傳 ok=False 並附上錯誤訊息，不拋例外。
     """
 
-    def __init__(self, bridge: BrowserBridgeManager, logger: RunLogger, action_delay: float = 0.4):
+    def __init__(self, bridge: BrowserBridgeManager, tool_executor: ToolExecutor, logger: RunLogger, action_delay: float = 0.4):
         self.bridge = bridge
+        self.tool_executor = tool_executor
         self.logger = logger
         self.action_delay = action_delay
 
@@ -91,50 +95,53 @@ class BrowserActionExecutor:
             return {"ok": True, "noop": name}
 
         # --- 橋接到 Extension 執行 ---
-        if not self.bridge.is_connected:
-            return {"ok": False, "error": "Extension WebSocket 尚未連線"}
+        # if not self.bridge.is_connected:
+        #     return {"ok": False, "error": "Extension WebSocket 尚未連線"}
 
         return await self._dispatch_browser_action(name, action)
 
-    async def _dispatch_browser_action(
-        self, name: str, action: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """將 action 送到 Extension 執行，回傳 result。"""
-        params: Dict[str, Any] = {}
+    async def _dispatch_browser_action(self, name: str, action: Dict[str, Any]) -> Dict[str, Any]:
 
         if name == ACTION_CLICK_ELEMENT:
-            self.logger.log(f"{ACTION_CLICK_ELEMENT}", action = action['element_id'])
-            params = {"element_id": action["element_id"]}
+            # 取得螢幕座標
+            pos = await self.bridge.send_command(
+                "get_element_screen_position",
+                {"element_id": action["params"]["element_id"]}
+            )
+            if not pos.get("ok"):
+                return {"ok": False, "error": pos.get("error")}
+            # 委託給 ToolExecutor 執行真實點擊
+            return self.tools.execute(
+                {"action": "click", "x": pos["screen_x"], "y": pos["screen_y"]},
+                scale=1.0  # 已經是螢幕絕對座標，不需要縮放
+            )
 
-        elif name == ACTION_CLICK_COORDINATE:
-            self.logger.log(f"{ACTION_CLICK_COORDINATE}", x = action['x'], y = action['y'])
-            params = {"x": action["x"], "y": action["y"]}
+        elif name == ACTION_SELECT_ELEMENT:
+            # select 保留 JS 方式
+            result = await self.bridge.send_command(name, {
+                "element_id": action["params"]["element_id"],
+                "value": action["params"]["target_value"],
+            })
+            return {"ok": True, **result}
 
         elif name == ACTION_TYPE_TEXT:
-            self.logger.log(f"{ACTION_TYPE_TEXT}", text = action['text'])
-            params = {
-                "text": action["text"],
-                "element_id": action.get("element_id"),   # 可選，有的話先 focus
-            }
+            eid = action["params"].get("element_id")
+            if eid:
+                pos = await self.bridge.send_command(
+                    "get_element_screen_position", {"element_id": eid}
+                )
+                if pos.get("ok"):
+                    self.tools.execute(
+                        {"action": "click", "x": pos["screen_x"], "y": pos["screen_y"]},
+                        scale=1.0
+                    )
+            return self.tools.execute(
+                {"action": "type_text", "text": action["params"]["text"]},
+                scale=1.0
+            )
 
-        elif name == ACTION_PRESS_KEY:
-            self.logger.log(f"{ACTION_PRESS_KEY}", key = action['key'])
-            params = {"key": action["key"]}
-
-        elif name == ACTION_HOTKEY:
-            self.logger.log(f"{ACTION_HOTKEY}", keys = action['keys'])
-            params = {"keys": action["keys"]}
-
-        elif name == ACTION_SCROLL:
-            self.logger.log(f"{ACTION_SCROLL}", amount = action['amount'])
-            params = {"amount": action["amount"]}
+        elif name in (ACTION_PRESS_KEY, ACTION_HOTKEY, ACTION_SCROLL):
+            return self.tools.execute(action["params"] | {"action": name}, scale=1.0)
 
         else:
-            self.logger.warning("[BrowserExecutor] 不支援的 action: %s", name)
-            return {"ok": False, "error": f"BrowserActionExecutor 不支援 action={name}"}
-
-        try:
-            result = await self.bridge.send_command(name, params)
-            return {"ok": True, **result}
-        except Exception as exc:
-            return {"ok": False, "error": str(exc)}
+            return {"ok": False, "error": f"不支援 action={name}"}
