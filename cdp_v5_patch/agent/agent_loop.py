@@ -1,0 +1,313 @@
+"""執行迴圈 — 支援 browser 模式與 screenshot fallback 模式。
+
+改動：
+- 新增 Executor / Verifier 兩階段流程控制
+  - Executor 決定 action，或輸出 request_verification
+  - request_verification → 呼叫 Verifier 判斷是否推進 plan step
+  - 只有 Verifier 說 advance_step 才推進 current_plan_step
+- 其他（safety / state / logger / confirm_fn）完全不動
+"""
+
+import json
+import logging
+from typing import Callable, Dict, List, Optional
+
+from . import prompts, safety, schemas
+from .logger import RunLogger, step_banner
+from .state import TaskState, can_transition
+
+logger = logging.getLogger(__name__)
+
+OBSERVATION_MODE_BROWSER = "browser"
+OBSERVATION_MODE_SCREENSHOT = "screenshot"
+
+
+class ExecutionResult:
+    def __init__(self, state: TaskState, reason: str, steps: int):
+        self.state = state
+        self.reason = reason
+        self.steps = steps
+
+
+class AgentLoop:
+    def __init__(
+        self,
+        client,
+        screen_manager,
+        tool_executor,
+        model: str,
+        run_logger: RunLogger,
+        cfg,
+        confirm_fn: Callable[[str], bool],
+        observation_provider=None,
+        action_executor=None,
+        observation_mode: str = OBSERVATION_MODE_SCREENSHOT,
+    ):
+        self.client = client
+        self.model = model
+        self.logger = run_logger
+        self.cfg = cfg
+        self.confirm_fn = confirm_fn
+        self.observation_mode = observation_mode
+        self.state = TaskState.IDLE
+        self.history: List[Dict] = []
+        self.screen = screen_manager
+        self.tools = tool_executor
+        self.observation_provider = observation_provider
+        self.action_executor = action_executor
+
+    def _set_state(self, dst: TaskState) -> None:
+        if self.state != dst and not can_transition(self.state, dst):
+            self.logger.log("illegal_transition", src=self.state.value, dst=dst.value)
+        self.state = dst
+
+    def _history_text(self) -> str:
+        recent = self.history[-self.cfg.HISTORY_WINDOW:]
+        lines = []
+        for h in recent:
+            a = h["action"]
+            name = a.get("action", "")
+            detail = a.get("element_id", "") or f"({a.get('x','')},{a.get('y','')})" if name in ("click_element","click","click_coordinate") else ""
+            lines.append(
+                f"- {name} {detail} reason={str(a.get('reason',''))[:40]} "
+                f"result={'ok' if h['result'].get('ok') else 'fail'}"
+            )
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # ★ Verifier：判斷目前 plan step 是否完成
+    # ------------------------------------------------------------------
+
+    async def _call_verifier(
+        self,
+        task: str,
+        plan_steps: List[Dict],
+        current_plan_step: int,
+        image_b64: str,
+        elements_text: str,
+        obs,
+    ) -> str:
+        """回傳 'advance_step' | 'continue' | 'task_failed'。"""
+        if current_plan_step >= len(plan_steps):
+            return "advance_step"
+
+        step_info = plan_steps[current_plan_step]
+        verify_user = prompts.build_verify_user(
+            task=task,
+            step_info=step_info,
+            history_text=self._history_text(),
+            page_url=obs.page_url if obs else "",
+            page_title=obs.page_title if obs else "",
+            elements_text=elements_text,
+        )
+        parsed, raw = self.client.chat_json(
+            self.model, prompts.VERIFY_SYSTEM, verify_user, image_b64=image_b64
+        )
+        self.logger.log(
+            "verifier_response",
+            plan_step=current_plan_step,
+            raw=raw[:1000],
+            parsed=parsed,
+        )
+
+        if parsed is None:
+            return "continue"
+
+        result = parsed.get("action", "continue")
+        print(f"  [Verifier] step={current_plan_step} action={result} reason={parsed.get('reason','')}")
+        if result == "advance_step":
+            return "advance_step"
+        if result == "task_failed":
+            return "task_failed"
+        return "continue"
+
+    # ------------------------------------------------------------------
+    # 主迴圈
+    # ------------------------------------------------------------------
+
+    async def run(self, task: str, plan: Dict) -> ExecutionResult:
+        self._set_state(TaskState.EXECUTING)
+        guard = safety.LoopGuard(self.cfg.MAX_SAME_ACTION_REPEAT, self.cfg.MAX_NO_CHANGE)
+        plan_steps = plan.get("plan", [])
+        plan_text = json.dumps(plan_steps, ensure_ascii=False)
+        print(plan_text)
+        consecutive_parse_fail = 0
+
+        # ★ 追蹤目前在 plan 的哪一步（由 Verifier 決定何時推進）
+        current_plan_step = 0
+
+        for step in range(0, self.cfg.MAX_STEPS + 1):
+            step_banner(step, self.state.value)
+            print(f"  [Plan] plan step {current_plan_step + 1}/{len(plan_steps)}: "
+                  f"{plan_steps[current_plan_step]['goal'] if current_plan_step < len(plan_steps) else '完成'}")
+
+            # ---- 觀察（原版不動）----
+            if self.observation_mode == OBSERVATION_MODE_BROWSER:
+                obs_result = await self._observe_browser(step)
+                if obs_result is not None:
+                    return obs_result
+                obs = self._last_obs
+                image_b64 = obs.screenshot_base64 or None
+                from browser.observation_provider import format_elements_for_prompt
+                elements_text = format_elements_for_prompt(obs.elements)
+                system_prompt = prompts.BROWSER_EXECUTION_SYSTEM
+                user_prompt = prompts.build_browser_execution_user(
+                    task=task,
+                    plan=plan_steps,
+                    current_step=current_plan_step,  # ★ plan step，不是 loop counter
+                    history_text=self._history_text(),
+                    page_url=obs.page_url,
+                    page_title=obs.page_title,
+                    elements_text=elements_text,
+                    screenshot_width=obs.screenshot_width,
+                    screenshot_height=obs.screenshot_height,
+                )
+                self.logger.log(
+                    "browser_observation",
+                    step=step,
+                    plan_step=current_plan_step,
+                    url=obs.page_url,
+                    page_title=obs.page_title,
+                    elements_count=len(obs.elements),
+                    screenshot_path=obs.screenshot_path,
+                    ws_connected=self.action_executor.bridge.is_connected if self.action_executor else False,
+                    observation=[vars(e) | {"bounds": vars(e.bounds)} for e in obs.elements],
+                )
+            else:
+                obs = None
+                elements_text = ""
+                shot = self.screen.capture(tag=f"step{step:02d}")
+                nc = guard.record_screen(shot["phash"])
+                if nc:
+                    self._set_state(TaskState.FAILED)
+                    self.logger.log("stop", step=step, reason=nc)
+                    return ExecutionResult(self.state, nc, step)
+                mw, mh = shot["model_size"]
+                image_b64 = shot["image_b64"]
+                system_prompt = prompts.EXECUTION_SYSTEM
+                user_prompt = prompts.build_execution_user(
+                    task, plan_text, self._history_text(), mw, mh
+                )
+                self.logger.log(
+                    "screenshot_observation",
+                    step=step,
+                    screenshot=shot["path"],
+                    screen_real=shot["real_size"],
+                    screen_model=shot["model_size"],
+                )
+
+            # ---- 模型推論（原版不動）----
+            parsed, raw = self.client.chat_json(
+                self.model, system_prompt, user_prompt, image_b64=image_b64
+            )
+            self.logger.log(
+                "model_response",
+                step=step,
+                plan_step=current_plan_step,
+                state=self.state.value,
+                raw=raw[:2000],
+                parsed_ok=parsed is not None,
+            )
+
+            if parsed is None:
+                consecutive_parse_fail += 1
+                print(f"[!] JSON 解析失敗（連續 {consecutive_parse_fail} 次）")
+                if consecutive_parse_fail >= 2:
+                    self._set_state(TaskState.FAILED)
+                    self.logger.log("stop", step=step, reason="JSON 連續解析失敗")
+                    return ExecutionResult(self.state, "JSON 連續解析失敗", step)
+                continue
+            consecutive_parse_fail = 0
+
+            # ---- Schema 驗證（原版不動）----
+            ok, err, action = schemas.validate_action(parsed)
+            self.logger.log("action_validation", step=step, ok=ok, error=err, action=action)
+            if not ok:
+                print(f"[!] 非法 action：{err}")
+                self.history.append({"action": {"action": "invalid", "reason": err},
+                                     "result": {"ok": False, "error": err}})
+                print(f"[!] 原始輸出：{raw[:300]}")
+                continue
+
+            print(f"[action] {action['action']}  reason={action.get('reason', '')}")
+
+            # ---- ★ request_verification：呼叫 Verifier ----
+            if action["action"] == "request_verification":
+                verify_result = await self._call_verifier(
+                    task, plan_steps, current_plan_step, image_b64, elements_text, obs
+                )
+                if verify_result == "advance_step":
+                    current_plan_step += 1
+                    print(f"  [Plan] ✓ 推進到 plan step {current_plan_step + 1}/{len(plan_steps)}")
+                    if current_plan_step >= len(plan_steps):
+                        self._set_state(TaskState.COMPLETED)
+                        self.logger.log("finish", step=step, reason="所有 plan step 完成")
+                        return ExecutionResult(self.state, "所有 plan step 完成", step)
+                elif verify_result == "task_failed":
+                    self._set_state(TaskState.FAILED)
+                    return ExecutionResult(self.state, "Verifier 判斷任務失敗", step)
+                # continue → executor 繼續重試
+                continue
+
+            # ---- 終止型（原版不動）----
+            if action["action"] == "finish_task":
+                self._set_state(TaskState.COMPLETED)
+                self.logger.log("finish", step=step, reason=action.get("reason", ""))
+                return ExecutionResult(self.state, action.get("reason", "任務完成"), step)
+            if action["action"] == "fail_task":
+                self._set_state(TaskState.FAILED)
+                self.logger.log("fail", step=step, reason=action.get("reason", ""))
+                return ExecutionResult(self.state, action.get("reason", "模型放棄"), step)
+
+            # ---- 安全檢查（原版不動）----
+            verdict, sreason = safety.check_action_safety(action)
+            self.logger.log("action_safety", step=step, verdict=verdict, reason=sreason)
+            if verdict == "block":
+                print(f"[SAFETY] 已封鎖：{sreason}")
+                self.history.append({"action": action, "result": {"ok": False, "error": sreason}})
+                continue
+            if verdict == "confirm":
+                self._set_state(TaskState.PAUSED)
+                approved = self.confirm_fn(sreason or "此動作需要確認")
+                self.logger.log("user_confirm", step=step, approved=approved, reason=sreason)
+                if not approved:
+                    self._set_state(TaskState.CANCELLED)
+                    return ExecutionResult(self.state, "使用者拒絕高風險動作", step)
+                self._set_state(TaskState.EXECUTING)
+                if action["action"] == "request_user_confirmation":
+                    self.history.append({"action": action, "result": {"ok": True, "confirmed": True}})
+                    continue
+
+            # ---- 重複動作偵測（原版不動）----
+            rep = guard.record_action(action)
+            if rep:
+                self._set_state(TaskState.FAILED)
+                self.logger.log("stop", step=step, reason=rep)
+                return ExecutionResult(self.state, rep, step)
+
+            if action["action"] == "screenshot":
+                self.history.append({"action": action, "result": {"ok": True, "noop": "screenshot"}})
+                continue
+
+            # ---- 執行（原版不動）----
+            if self.observation_mode == OBSERVATION_MODE_BROWSER and self.action_executor:
+                result = await self.action_executor.execute(action)
+            else:
+                result = self.tools.execute(action, shot["scale"])
+
+            self.logger.log("action_result", step=step, plan_step=current_plan_step, action=action, result=result)
+            print(f"[result] {'ok' if result.get('ok') else 'FAIL: ' + str(result.get('error'))}")
+            self.history.append({"action": action, "result": result})
+
+        self._set_state(TaskState.FAILED)
+        self.logger.log("stop", reason=f"達到 max_steps={self.cfg.MAX_STEPS}")
+        return ExecutionResult(self.state, f"達到最大步數 {self.cfg.MAX_STEPS}", self.cfg.MAX_STEPS)
+
+    async def _observe_browser(self, step: int) -> Optional[ExecutionResult]:
+        obs = await self.observation_provider.get_observation()
+        if obs.error:
+            self._set_state(TaskState.FAILED)
+            self.logger.log("stop", step=step, reason=f"觀察失敗: {obs.error}")
+            return ExecutionResult(self.state, f"取得頁面觀察失敗: {obs.error}", step)
+        self._last_obs = obs
+        return None
